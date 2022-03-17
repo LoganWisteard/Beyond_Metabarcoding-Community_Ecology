@@ -1,0 +1,106 @@
+---
+title: "Beyond Metabarcoding- Community Ecology"
+author: "Logan Wisteard"
+date: '2022-03-16'
+output: pdf_document
+---
+### Project Info
+
+Setup Github username: [LoganWisteard](https://github.com/LoganWisteard)  
+[Github repository](https://github.com/LoganWisteard/Beyond_Metabarcoding-Community_Ecology)
+
+# Introduction
+The data set FloristicSurvey.csv contains the results of a floristic survey at the Queen’s University Biological Station (QUBS). This data set investigates garlic mustard, which is an invasive species that is known to easily and rapidly spread and cause damage to other plants and organisms.
+
+This report will address two important biological questions:
+
+1. What effect (if any) does garlic mustard have on the plant community?
+2. What has a stronger effect on plant communities: the presence/absence of garlic mustard (in/out) or sampling population?
+
+# Load libraries
+```{r}
+library(devtools)
+devtools::install_github('GuangchuangYu/ggtree', force = TRUE)
+library("ggtree")
+library(dplyr)
+library(ape)
+library(vegan)
+library(ggtree)
+library(reshape2)
+library(ggplot2)
+```
+
+### Load data
+```{r data}
+floralSurvey <- read.csv("./A8_WISTEARD_LOGAN_Data.csv")
+```
+### preparing the data
+reordering the columns and removing unneeded ones
+```{r }
+floralSubset <- floralSurvey %>% 
+select(Claytonia_virginiana:maianthenum_racemosum)
+row.names(floralSubset) <- floralSurvey$Quadrate
+```
+
+### Calculate Bray-Curtis dissimilarity matrix
+```{r}
+dist <- vegdist(floralSubset, method = "bray", binary = FALSE)
+```
+
+Visualize the matrix
+```{r}
+distMat <- as.matrix(dist)
+distLong <- melt(distMat)
+ggplot(data = distLong, mapping = aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradientn(colours = c("white", "blue", "green", "red")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+Figure 1. Distance matrix using each Quadrate with Bray-Curtis dissimilarity method.
+
+Cluster our samples by their similarity. We can use the neighbor-joining method:
+```{r}
+floralNJ <- nj(dist)
+ggtree(floralNJ, layout = "rectangular") %<+% floralSurvey +
+  geom_tree(mapping = aes(colour = Location)) +
+  geom_tiplab() +
+  scale_colour_discrete(name = "Garlic Mustard", labels = c("present", "absent"))
+```
+Figure 2. This tree indicates what similarities can be found within differences in sampling sites
+
+NMDS uses an algorithm for plotting points so that two points that are similar end up close together on the graph. 
+```{r}
+set.seed(13)
+floralnmds <- metaMDS(dist, k = 2)
+pdat <- data.frame(NMDS1 = floralnmds$points[,1],
+                   NMDS2 = floralnmds$points[,2],
+                   Quadrate = row.names(floralSubset))
+pdat <- merge(pdat, floralSurvey, by = "Quadrate", all.x = T, all.y = T)
+```
+NMDS plot
+
+```{r}
+ggplot(data = pdat, aes(x = NMDS1, y = NMDS2, colour = Location)) +
+  geom_point(size = 2) +
+  scale_colour_discrete(labels = c("present", "absent"), name = "Garlic Mustard") +
+  theme_classic()
+```
+Figure 3.1.Scatter plot to further analyze the NMD results with colour coded populations.
+
+```{r}
+ggplot(data = pdat, aes(x = NMDS1, y = NMDS2, colour = factor(Population), shape = Location)) +
+  geom_point(size = 2) +
+  scale_colour_discrete(name = "Population") +
+  theme_classic()
+```
+Figure 3.2. Attempting to try and find more clustering within populations and locations.
+
+## Discussion
+
+Based on Figure 1. and the similarity between the samples, it is likely that sites in the same presence or absence have them most similarity. This likely does not have an effect on the plant community. A neighbor joining tree may display these findings more clearly.
+
+Based on Figure 2. and the neighbor joining method, the sample sites from within the same population are most similar to one another. While the effects of garlic mustard are only similar within the same population
+
+Figure 3.1. and the NMDS, it appears that the sampling populations have greater effects on the plant communities than presence or absence of garlic mustard.
+Based on Figure 3.1. there was still no clustering to make a clear conclusion. Figure 3.2. shows that there may be sites affected within the same populations as there was more evidence of clustering.
+
